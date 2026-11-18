@@ -2,7 +2,7 @@
 
 Command line tools (`pbx`) that read **your own copy** of the Point Blank client folders, unpack the `.i3Pack` archives and export models, animations, sounds, textures and UI to open formats (GLB, JSON, OGG, PNG, DDS). It is a private study tool. This repository contains no game files.
 
-Read this in Portuguese: [README.pt-BR.md](README.pt-BR.md).
+This is a fork of [LeandroDettmer/pb-extract-tools-public](https://github.com/LeandroDettmer/pb-extract-tools-public), used with [kruumy/point-blank-webport-mvm](https://github.com/kruumy/point-blank-webport-mvm). It adds the export of each map's sky scene (`sky/sky.glb`).
 
 ## What it is
 
@@ -24,7 +24,7 @@ Windows is the platform the tools are developed on. The Python `py` launcher is 
 ## Install
 
 ```bash
-git clone https://github.com/LeandroDettmer/pb-extract-tools-public.git pb-extract-tools
+git clone https://github.com/kruumy/pb-extract-tools-public.git pb-extract-tools
 cd pb-extract-tools
 npm install
 npm link          # optional: makes `pbx` available everywhere
@@ -102,8 +102,8 @@ Each row is one command. "Needs" lists the clients it reads, and whether it need
 | `pbx export sound-rsc` | per-sound volume and distance table | Cross (`--client`) | `pbx export sound-rsc` |
 | `pbx export headgear` | head accessories (masks, berets, helmets) to GLB | Cross (`--client`), `--web` | `pbx --web D:\web-app export headgear` |
 | `pbx export ragdoll` | death ragdoll data: `chars/<id>/ragdoll.json` | none | `pbx export ragdoll` |
-| `pbx export maps` | every playable map: visual, collision, `maps/index.json` | Cross | `pbx export maps` |
-| `pbx export visual` | one map render scene to `visual.glb` | Cross (`--client`) | `pbx export visual NStation` |
+| `pbx export maps` | every playable map: visual, sky, collision, `maps/index.json` | Cross | `pbx export maps` |
+| `pbx export visual` | one map render scene to `visual.glb`; with `--sky`, its sky scene to `sky/sky.glb` (indoor maps have none) | Cross (`--client`) | `pbx export visual NStation`, `pbx export visual NPort --sky` |
 | `pbx export collision` | one map collision to `collision.glb` and `.json` | Cross (`--client`) | `pbx export collision NStation --out out/maps` |
 | `pbx export surfaces` | impact surface per shape: `surfaces.json` (needs collision) | Cross (`--client`) | `pbx export surfaces NStation` |
 | `pbx export lighting` | per-map `lighting.json` | Cross (`--client`) | `pbx export lighting` |
@@ -311,7 +311,7 @@ What works today for a client other than Cross. Stated plainly. Nothing here is 
 |---|---|---|
 | characters and weapon models | GLB (glTF 2.0 binary) + PNG textures + JSON index | `export batch`, `anim3pv`, `anim1pv`, `c5-bomb`, `headgear`, `ui-idle` |
 | textures for models | DXT `.dds` next to PNG | `model-dds`, `map-dds`, `env-ref`, `visual`, `cross-showroom` |
-| map geometry | `visual.glb`, `collision.glb` + `collision.json`, `surfaces.json`, `lighting.json`, `props.json` | `maps`, `visual`, `collision`, `surfaces`, `lighting`, `props`, `env-ref` |
+| map geometry | `visual.glb`, `sky/sky.glb`, `collision.glb` + `collision.json`, `surfaces.json`, `lighting.json`, `props.json` | `maps`, `visual`, `collision`, `surfaces`, `lighting`, `props`, `env-ref` |
 | clip libraries and data | JSON (`index.json`, `ragdoll.json`, `weaponfx.json`, `ambient.json`) | `anim3pv`, `anim1pv`, `weapon-anim`, `weaponfx`, `ragdoll`, `ambient`, `sound-rsc` |
 | sounds | `.wav` (source), `.ogg` (Vorbis, what the browser plays) | `sfx`, `weapon-sfx`, `charsfx`, `announce`, `c4-sfx`, `break-sfx`, `radio-voice`, `wav-to-ogg` (`sound convert`) |
 | UI | PNG atlases + JSON (scenes, templates, strings, Lua bindings) | `ui *`, `classic-ui`, `clanmark`, `cross-icons` |
