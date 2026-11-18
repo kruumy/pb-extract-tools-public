@@ -1,8 +1,10 @@
 #!/usr/bin/env node
 // Export the visual (render) scene of a Point Blank map to glTF for three.js. Pure Node ESM, builtins only.
 //
-//   node export-visual.mjs <Map> [--pack-dir DIR | --root DIR] [--out DIR] [--name DIR_NAME] [--check-only]
+//   node export-visual.mjs <Map> [--pack-dir DIR | --root DIR] [--out DIR] [--name DIR_NAME] [--check-only] [--sky]
 //   e.g. node export-visual.mjs Metro
+//   --sky: the sky scene instead (the second-largest I3R2 scene, e.g. NPort "Nport_Sky", a 152 m dome) -> sky/sky.glb,
+//          sky/sky.json, sky/tex/; maps without one (indoor: Metro) write nothing
 //
 // Output (out/maps/<map lowercased>/):
 //   visual.glb     one mesh per material, one primitive per i3GeometryAttr (GEO2); world matrices
@@ -261,13 +263,14 @@ function attrObjTexture(buf, file, a) { // i3TextureBindAttr / i3LuxMapBindAttr 
   return ao ? file.byId.get(buf.readUInt32LE(ao.off) & 0xffff) || null : null;
 }
 
-export function exportVisual(mapName, { packDir = clientPath(baseClient('cross'), 'Pack'), outRoot = assetPath('maps'), log = console.log, dirName, ddsOnly = false } = {}) {
+export function exportVisual(mapName, { packDir = clientPath(baseClient('cross'), 'Pack'), outRoot = assetPath('maps'), log = console.log, dirName, ddsOnly = false, sky = false } = {}) {
   const packFile = path.join(packDir, `${mapName}.i3Pack`);
   const d = fs.readFileSync(packFile);
   const scenes = scanI3R2(d).filter((b) => b.objects.some((o) => o.cls === 'i3Geometry'))
     .sort((a, b) => b.objects.filter((o) => o.cls === 'i3Geometry').length - a.objects.filter((o) => o.cls === 'i3Geometry').length);
   if (!scenes.length) throw new Error(`${mapName}: no scene with i3Geometry`);
-  const file = scenes[0];
+  const file = scenes[sky ? 1 : 0];
+  if (!file) return { summary: null, outDir: null };
   const meshes = collectMeshes(d, file, { log: (s) => log('  ' + s) });
 
   // textures: embedded i3Texture objects hold an I3IB; external ones live in <Map>_Textures / <Map> packs
@@ -290,7 +293,7 @@ export function exportVisual(mapName, { packDir = clientPath(baseClient('cross')
     return i ? { ...i, buf: d, source: 'embedded' } : null;
   };
 
-  const outDir = path.join(outRoot, dirName || mapName.toLowerCase());
+  const outDir = path.join(outRoot, dirName || mapName.toLowerCase(), sky ? 'sky' : '');
   const texDir = path.join(outDir, 'tex');
   if (!ddsOnly) fs.rmSync(texDir, { recursive: true, force: true });
   fs.mkdirSync(texDir, { recursive: true });
@@ -412,7 +415,7 @@ export function exportVisual(mapName, { packDir = clientPath(baseClient('cross')
   J.extras = { source: `${mapName}.i3Pack`, axes: 'i3 world == three.js (Y-up, metres), see tools/AXES.md', lightMap: 'material.extras.lightMap = { index, texCoord: 1 }' };
 
   if (ddsOnly) return { summary: { ...ddsStats, names: J.images.map((i) => i.name) }, outDir };
-  const glbFile = path.join(outDir, 'visual.glb');
+  const glbFile = path.join(outDir, sky ? 'sky.glb' : 'visual.glb');
   fs.writeFileSync(glbFile, G.build());
   const check = checkGLB(glbFile);
   const summary = {
@@ -424,7 +427,7 @@ export function exportVisual(mapName, { packDir = clientPath(baseClient('cross')
     skipped: { keyedGeometries: stats.keyed, keyedTris: stats.keyedTris, untexturedGeometries: stats.noTexture, missingTextures: missing.map(stem), guessedTextureNames: guessed },
     bounds: check.bounds, check: { ok: check.ok, errors: check.errors, degenerateTris: check.degenerate },
   };
-  fs.writeFileSync(path.join(outDir, 'visual.json'), JSON.stringify(summary, null, 1));
+  fs.writeFileSync(path.join(outDir, sky ? 'sky.json' : 'visual.json'), JSON.stringify(summary, null, 1));
   return { summary, outDir };
 }
 
@@ -435,13 +438,20 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   opt('--client'); // read by baseClient() from argv
   const packDir = opt('--pack-dir') ?? opt('--root'), outRoot = opt('--out'), dirName = opt('--name'); // --root: alternative pack root (e.g. Clients/PBKaybo/GameData/Apps/PB/Pack)
   const checkOnly = args.includes('--check-only'); if (checkOnly) args.splice(args.indexOf('--check-only'), 1);
-  if (!args.length) { console.error('usage: export-visual.mjs <Map> [...Map] [--pack-dir DIR] [--out DIR] [--name DIR_NAME] [--check-only]'); process.exit(2); }
+  const sky = args.includes('--sky'); if (sky) args.splice(args.indexOf('--sky'), 1);
+  if (!args.length) { console.error('usage: export-visual.mjs <Map> [...Map] [--pack-dir DIR] [--out DIR] [--name DIR_NAME] [--check-only] [--sky]'); process.exit(2); }
   if (dirName && args.length > 1) { console.error('--name needs exactly one <Map>'); process.exit(2); }
   let bad = 0;
   for (const map of args) {
     const root = outRoot ? path.resolve(outRoot) : assetPath('maps');
     const dir = path.join(root, dirName || map.toLowerCase());
     try {
+      if (sky) {
+        const { summary: s } = exportVisual(map, { ...(packDir && { packDir: path.resolve(packDir) }), outRoot: root, dirName, sky });
+        console.log(s ? `${map}: sky meshes=${s.meshes} tris=${s.tris} textures=${s.textures} check=${s.check.ok ? 'OK' : s.check.errors.join('; ')}` : `${map}: no sky scene`);
+        if (s && !s.check.ok) bad++;
+        continue;
+      }
       if (!checkOnly) {
         const { summary: s } = exportVisual(map, { ...(packDir && { packDir: path.resolve(packDir) }), outRoot: root, dirName });
         console.log(`${map}: meshes=${s.meshes} prims=${s.primitives} tris=${s.tris} verts=${s.verts} materials=${s.materials} textures=${s.textures} lightmapped=${s.lightmapped} alpha=${JSON.stringify(s.alpha)} keyedSkipped=${s.skipped.keyedGeometries} missingTex=${s.skipped.missingTextures.length} guessed=${s.skipped.guessedTextureNames.join(',') || '-'}`);

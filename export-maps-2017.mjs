@@ -86,6 +86,7 @@ const COLLISION = path.join(HERE, 'export-collision.mjs');
 function exportMap(m) {
   const dir = dirOf(m);
   const { summary: s } = exportVisual(m, { packDir: PACK, outRoot: MAPS, dirName: dir, log: () => {} });
+  exportVisual(m, { packDir: PACK, outRoot: MAPS, dirName: dir, log: () => {}, sky: true });
   execFileSync(process.execPath, [COLLISION, m, '--pack-dir', PACK, '--out', MAPS, '--name', dir], { stdio: 'pipe' });
   console.log(`${m} -> ${dir}: tris=${s.tris} textures=${s.textures} lightmapped=${s.lightmapped} keyedSkipped=${s.skipped.keyedGeometries} missingTex=${s.skipped.missingTextures.length}`);
 }
