@@ -52,6 +52,7 @@ for (const m of mapXml.matchAll(/<Map\b([^>]*)>([\s\S]*?)<\/Map>/g)) {
 const assets = assetPath();
 const prev = existsSync(out) ? JSON.parse(readFileSync(out, "utf8")) : {};
 let itemStats = prev.itemStats ?? {}, weaponGroup = prev.weaponGroup ?? {}, propBlast = prev.propBlast ?? {};
+const prevBlast = propBlast;
 let defaultLoadout = prev.defaultLoadout ?? {};
 const weaponsJson = resolve(assets, "cross/weapons/weapons.json");
 if (existsSync(weaponsJson)) {
@@ -66,6 +67,7 @@ if (existsSync(weaponsJson)) {
   // id with that name; the core matches a hit to the slot's own item through the same name group
   const groupByName = new Map();
   for (const w of weapons) if (!groupByName.has(w.name)) groupByName.set(w.name, w.id);
+  const idBySrc = new Map(weapons.map((w) => [w.pb?.src, w.id]));
   for (const w of weapons) {
     const pb = w.pb ?? {}, m = pb.melee ?? {};
     const melee = w.fireMode === "melee", thrown = w.fireMode === "throw";
@@ -85,10 +87,17 @@ if (existsSync(weaponsJson)) {
     const s = { damage: w.damage, range: Math.max(w.range, pb.range ?? 0), fireDelay: Math.round(fireDelay * 1e4) / 1e4 };
     if (damageMax !== w.damage) s.damageMax = damageMax;
     if (hits !== 1) s.hits = hits;
+    // RMB extension hits (CrossFire Ext_Damage, DirectMelee stock blow; WeaponSystem.shoot / stockBlow): their own cap, valid
+    // only within the extension's range, so the item's normal hits keep theirs
+    const extDamage = Math.max(pb.ext?.damage ?? 0, pb.ext?.meleeDamage ?? 0);
+    if (extDamage > damageMax) s.ext = { damage: extDamage, range: pb.ext.range ?? s.range };
     if (w.className === "Sniper" || thrown || blast) s.multi = true; // a sniper bullet goes through every character on its line
     if (w.className === "Mission") s.mission = true;
     // Extension2 "Dual": the extension key swaps the item in hand for its dual one and back (WeaponSystem.toggleDual)
     if (pb.dualId ?? pb.dualOf) s.alt = pb.dualId ?? pb.dualOf;
+    // GrenadeLauncher: the shell item its raised launcher fires (the client names the blast's hit by it)
+    const shell = idBySrc.get(pb.ext?.shell?.src);
+    if (shell) s.shell = shell;
     itemStats[w.id] = s;
     if (groupByName.get(w.name) !== w.id) weaponGroup[w.id] = groupByName.get(w.name);
   }
@@ -98,10 +107,15 @@ if (existsSync(weaponsJson)) {
   }
   // breakable props that explode (car / drum, i3ActionExplosion): the web sends their blast as a hit of the breaker's weapon
   // (game.ts propExplosionHurt), so a record that breaks a prop may carry up to this much damage per hit
+  // pbx runs props after this script (props reads maps from here): a map without its props.json yet keeps its old value
   propBlast = {};
   for (const map of JSON.parse(readFileSync(resolve(assets, "maps/index.json"), "utf8"))) {
     const props = resolve(assets, "maps", map.id, "props.json");
-    if (map.mapId == null || !existsSync(props)) continue;
+    if (map.mapId == null) continue;
+    if (!existsSync(props)) {
+      if (prevBlast[map.mapId]) propBlast[map.mapId] = Math.max(propBlast[map.mapId] ?? 0, prevBlast[map.mapId]);
+      continue;
+    }
     const max = Math.max(0, ...Object.values(JSON.parse(readFileSync(props, "utf8")).objects ?? {}).map((o) => o.explosion?.damage ?? 0));
     if (max > 0) propBlast[map.mapId] = Math.max(propBlast[map.mapId] ?? 0, max);
   }

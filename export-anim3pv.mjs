@@ -39,7 +39,7 @@ const ASSETS = assetPath();
  * arms. src/game/charAnimLib.ts dualTables merges the pairs (same as the 1PV side, tools/export-anim1pv.mjs).
  */
 const DUAL_STATES = ['LeftIdle', 'RightIdle', 'LeftMove', 'RightMove', 'LeftAttack', 'RightAttack'];
-/** states exported per upper stance (the rest - Extension*, Grenade/Knife/ShotGun/AttackIdle_Left/CrossIdle* stances - are not driven by the web client; *Master is exported only, [INFERIDO] 0x613710) */
+/** states exported per upper stance (the rest - Extension*, Knife/ShotGun/AttackIdle_Left/CrossIdle_Left stances - are not driven by the web client; *Master is exported only, [INFERIDO] 0x613710) */
 const JUMP_DAMAGE = ['JumpStart', 'JumpEnd', 'DamageFrontLeftA', 'DamageFrontLeftB', 'DamageFrontRightA', 'DamageFrontRightB', 'DamageBackA', 'DamageBackB'];
 const UPPER_STATES = {
   AttackIdle: ['Idle', 'Move', 'Attack', 'AttackReady', 'AttackBurst', 'SecondaryAttack', 'LoadMagazine', 'LoadBullet', 'LoadMagazineReady', 'Change',
@@ -48,6 +48,8 @@ const UPPER_STATES = {
     // lobby / inventory showroom (src/lobby/screens/preview3d.ts): full-skeleton clips per weapon AI, not loaded by the match
     'UI_Idle_Stand', 'UI_IdleA', 'UI_IdleB', 'UI_Idle_Change'],
   Zoom: ['Idle', 'Move', 'Attack', 'AttackBurst', 'LoadMagazine', 'LoadBullet', 'LoadMagazineReady', 'LoadMagazine2', 'FireBullet', ...JUMP_DAMAGE],
+  CrossIdle: ['Change', 'ExtensionActivate', 'ExtensionDeactivate', 'LoadMagazine', 'LoadBullet', ...JUMP_DAMAGE, ...DUAL_STATES],
+  Grenade: ['Idle', 'Move', 'Attack', 'LoadMagazine', 'LoadBullet', 'Change', ...JUMP_DAMAGE],
 };
 /**
  * [RECRIADO] AI for weapons whose pef AI has no usable 3PV tree in either client (newer weapons): the basic PB weapon of

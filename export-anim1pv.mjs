@@ -43,6 +43,10 @@ const STATES = {
   AttackIdle: ['Idle', 'Move', 'Attack', 'AttackBurst', 'Attack2', 'AttackReady', 'SecondaryAttack', 'LoadMagazine', 'LoadBullet', 'Change', 'ExtensionActivate', 'ExtensionDeactivate', ...DUAL_STATES,
     'LeftJumpStart', 'LeftJumpEnd', 'RightJumpStart', 'RightJumpEnd', ...JUMP_DAMAGE, ...RELOAD_EXTRA],
   Zoom: ['Idle', 'Move', 'Attack', 'AttackBurst', 'LoadMagazine', 'LoadBullet', 'Change', ...JUMP_DAMAGE, ...RELOAD_EXTRA],
+  // RMB extension stances: HK45 Dual CrossFire (crossed arms, Ext_* clips), K201 GrenadeLauncher (launcher raised, *_Grenade clips)
+  CrossIdle: ['Change', 'ExtensionActivate', 'ExtensionDeactivate', 'LoadMagazine', 'LoadBullet', ...DUAL_STATES,
+    'LeftJumpStart', 'LeftJumpEnd', 'RightJumpStart', 'RightJumpEnd', ...JUMP_DAMAGE],
+  Grenade: ['Idle', 'Move', 'Attack', 'LoadMagazine', 'LoadBullet', 'Change', 'ExtensionActivate', 'ExtensionDeactivate', ...JUMP_DAMAGE],
 };
 /**
  * [RECRIADO] AI for weapons whose pef AI has no 1PV tree in the 2017 I3CHR (newer weapons, dual-wield AIs whose

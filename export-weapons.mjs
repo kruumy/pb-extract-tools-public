@@ -26,7 +26,6 @@ import { convertWavs } from './wav-to-ogg.mjs';
 import { carve, decodeContent, parsePack } from './i3pack/unpack.mjs';
 
 const XML = serverPath('runtime', 'Data', 'Match', 'ItemStatistics.xml'); // server/binary/Debug was removed by the reorganisation (d593df83)
-const PACK_DIR = clientPath(baseClient('br3123'), 'Pack');
 const SFX_PACK_DIR = clientPath('cross', 'Pack'); // sounds: PBCross packs only (no 3.123 clip)
 const OUT = assetPath(baseClient('cross'), 'weapons'); // new subfolder: public/assets/weapons/weapons.json stays the 3.123 output
 const args = process.argv.slice(2);
@@ -177,7 +176,11 @@ function pbBlock(get, src, family) {
       zoom: n('MoveNormal_Zoom'), scope: n('MoveNormal_Scope') }),
     ext: pick({ deviationFactor: n('Ext_DeviationFactor'), recoilVertFactor: n('Ext_RecoilVertFactor'),
       recoilHorzFactor: n('Ext_RecoilHorzFactor'), recoilHorzCount: n('Ext_RecoilHorzCount'), recoilVertCount: n('Ext_RecoilVertCount'),
-      autoFireCount: n('Ext_AutoFireCount'), fireDelay: n('Ext_FireDelay'), damage: n('Ext_Damage') }),
+      autoFireCount: n('Ext_AutoFireCount'), fireDelay: n('Ext_FireDelay'), damage: n('Ext_Damage'),
+      // DirectMelee (M1887 stock blow), CrossFire reach, DualMag magazine flip, GrenadeLauncher shell and its sound
+      meleeDamage: n('ExtensionDamage'), meleeTime: n('ExtensionAttackTime'), range: n('ExtensionRange'),
+      reloadTimeDual: n('ReloadTimeDual'), info: typeof get('_ExtensionInfo') === 'string' && get('_ExtensionInfo') ? get('_ExtensionInfo') : undefined,
+      fireSound: typeof get('_FireSoundExt') === 'string' && get('_FireSoundExt') ? get('_FireSoundExt') : undefined }),
     melee: family === 'KNIFE' ? pick({ damageA1: n('AttackDamageA1'), damageA2: n('AttackDamageA2'),
       damageB1: n('AttackDamageB1'), damageB2: n('AttackDamageB2'), timeA1: n('AttackTimeA1'), timeA2: n('AttackTimeA2'),
       timeB1: n('AttackTimeB1'), timeB2: n('AttackTimeB2'), fireDelay2: n('FireDelay2'),
@@ -252,6 +255,9 @@ function exportData(packKeys) {
     const ow = num(cross.f.OriginalWeaponID);
     const baseSrc = DUAL_KNIFE_BASE[w.id] ?? (ow !== undefined && ow !== w.id ? crossOf.get(ow)?.src : undefined);
     const pb = buildPb(cross, w.family, baseSrc);
+    // GrenadeLauncher: _ExtensionInfo names the shell entry (GrenadeShell/GrenadeShell_K201) whose stats the launched round uses
+    const shell = pb.ext?.info && [...pCross.idx.values()].find(h => h.src === `GrenadeShell/${pb.ext.info}`);
+    if (shell) pb.ext.shell = pbBlock(k => shell.f[k], `pef-cross:${shell.src}`, 'GRENADE');
     w.pb = pb;
     stat.cross++;
     if (pb.fireDelay > 0) w.fireDelay = pb.fireDelay;
@@ -473,8 +479,6 @@ function attachAnimTimes(weapons) {
 }
 
 // ---- main -------------------------------------------------------------------
-const allPackKeys = fs.existsSync(PACK_DIR) ? fs.readdirSync(PACK_DIR)
-  .filter(f => /^Sound_Weapon_.+\.i3Pack$/i.test(f)).map(f => f.replace(/^Sound_Weapon_/, '').replace(/\.i3Pack$/i, '')) : [];
 const allSfxKeys = fs.existsSync(SFX_PACK_DIR) ? fs.readdirSync(SFX_PACK_DIR)
   .filter(f => /^Sound_Weapon_.+\.i3Pack$/i.test(f)).map(f => f.replace(/^Sound_Weapon_/, '').replace(/\.i3Pack$/i, '')) : [];
 if (args.includes('--anim-only')) {
@@ -504,5 +508,6 @@ if (args.includes('--sfx-only')) {
   exportSfx(sfxKeys(cross, new Set(Object.values(DEFAULT_LOADOUT))));
   process.exit(0);
 }
-const weapons = exportData(allPackKeys);
+// sfx keys name the packs whose sounds are exported (SFX_PACK_DIR)
+const weapons = exportData(allSfxKeys);
 if (!args.includes('--no-sfx')) exportSfx(sfxKeys(weapons, new Set(Object.values(DEFAULT_LOADOUT))));
