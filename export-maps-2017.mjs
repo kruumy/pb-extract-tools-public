@@ -57,8 +57,12 @@ const MAP_IDS = {
   RampartTown: [70, 'S'], Ballistic: [71, 'S'], FalluCity: [76, 'S'], Hindrance: [77, 'S'], Sewerage: [78, 'M'],
   SlumArea: [79, 'U'], New_Library: [80, 'S'], FatalZone: [83, 'U'], MarineWave: [84, 'S'], StillRaid: [85, 'S'],
   BrokenAlley: [88, 'M'], Provence: [91, 'M'], Mihawk: [93, 'S'], Ampera: [95, 'U'], S_TwoTowers: [96, 'M'],
+  Hardrock: [49, 'S'],
+  // no server data lists these: ids picked from the unused range below 192 (the random-map bitmask). DeadTown has no
+  // lighting and no radar: the client plays it with the fallback light and no minimap (pbLighting.ts NO_LIGHTING)
+  AngkorRuins: [150, 'R'], BlackMamba: [151, 'R'], GhostTown: [152, 'R'], RothenVillage: [153, 'R'], Giran2: [154, 'R'], DeadTown: [155, 'R'],
 };
-const ID_SRC = { M: 'Matches.xml', S: 'MapStructure.xml', U: 'Stage.pef StageUID' };
+const ID_SRC = { M: 'Matches.xml', S: 'MapStructure.xml', U: 'Stage.pef StageUID', R: '[RECRIADO] unused id' };
 // Stage_Brazil.txt keys that differ from the pack name
 const STAGE_KEY = { Luxville: 'LuxVille', SafeHouse: 'Safehouse', Shoppingcenter: 'ShoppingCenter', Rothenvillage: 'RothenVillage' };
 

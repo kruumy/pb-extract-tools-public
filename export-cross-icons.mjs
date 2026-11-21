@@ -281,6 +281,14 @@ if (fs.existsSync(assetPath(KEY, 'weapons', 'weapons.json'))) {
     const r = byName.weapon[/^pef-cross:[^/]+\/(.+)$/.exec(w.pb?.src ?? '')?.[1]];
     if (r) put(icons, w.id, { ...r, match: 'catalog' }, 'weapon');
   }
+  // [INFERIDO] blocks with no WeaponSelect cell of their own (no or a transparent _UIShapeIndex) take the cell of the Cross block of
+  // the same weapon: a single BoneKnife the Dual_BoneKnife of its skin, the Kriss Vector SV dummy the real KrissSuperV_Vector,
+  // the single P99 the P99-Hak_CIC. C4 has no UI art at all (no cell, empty UiPath): no icon.
+  const cellAlias = (n) => (/^BoneKnife/.test(n) ? `Dual_${n}` : n === 'KrissSuperV_Vector_Dummy' ? 'KrissSuperV_Vector' : n === 'P99' ? 'P99-Hak_CIC' : null);
+  for (const w of JSON.parse(fs.readFileSync(assetPath(KEY, 'weapons', 'weapons.json'), 'utf8')).weapons) {
+    const to = cellAlias(/^pef-cross:[^/]+\/(.+)$/.exec(w.pb?.src ?? '')?.[1] ?? ''), r = to && byName.weapon[to];
+    if (r) put(icons, w.id, { ...r, match: `alias ${to} [INFERIDO]` }, 'weapon');
+  }
 }
 
 const maps = {};

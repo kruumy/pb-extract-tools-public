@@ -55,7 +55,7 @@ const OBJ_OUT = path.join(ASSETS, 'objects');
 // Server.Match map data: the matchData.json that src/host/matchCore.ts loads (match-data.mjs builds it from MapStructure.xml)
 const MATCH_DATA = webPath('src', 'host', 'data', 'matchData.json');
 
-const CLS = { object: 0xb713f4d9, box: 0x4cc77521, respawn: 0x4ce77b33, world: 0x5eab4a90, light: 0xd966c30d, path: 0xa4b2bf63 };
+const CLS = { object: 0xb713f4d9, box: 0x4cc77521, respawn: 0x4ce77b33, world: 0x5eab4a90, light: 0xd966c30d, path: 0xa4b2bf63, ladder: 0xdedddfeb };
 // Destroy-mode objectives are not CLS.object instances: Breakdown Transformer (blue) 0x3f763d11, helicopter_uh60 (red) 0x94631b06;
 // Helispot Helispot_UH60_BLUE / _RED 0x1e32413f: GINS pose identity; the model is already at its start pose (see below).
 const OBJECTIVE_CLS = new Set([0x3f763d11, 0x94631b06, 0x1e32413f]);
@@ -735,15 +735,19 @@ function readMapStructure() {
   return maps;
 }
 
+/** (0, 1, 0) rotated by the quaternion [x, y, z, w] */
+const quatY = ([x, y, z, w]) => [2 * (x * y - w * z), 1 - 2 * (x * x + z * z), 2 * (y * z + w * x)];
+
 // ---- main ---------------------------------------------------------------------------------------------------------
 function exportMapProps(pack, dir, mapId, IX, texFor, defs, serverMaps, log) {
   const scene = path.join(IX.packDir, `${pack}_Scene.i3Pack`);
   if (!fs.existsSync(scene)) return { dir, error: 'no _Scene pack' };
   const { ver, records } = readGINS(fs.readFileSync(scene));
-  const props = [], unresolved = [], volumes = [];
+  const props = [], unresolved = [], volumes = [], ladders = [];
   let errors = 0; // def / broken-state failures (not no-model states) created by this map
   for (const r of records) {
     if (r.cls === CLS.box) { volumes.push({ name: r.name, pos: r.pos.map(r4), quat: r.quat.map(r4), size: r.scale.map(r4) }); continue; }
+    if (r.cls === CLS.ladder) { ladders.push({ name: r.name, pos: r.pos.map(r4), quat: r.quat.map(r4), size: r.scale.map(r4), up: quatY(r.quat).map(r4) }); continue; }
     if (r.cls !== CLS.object && !OBJECTIVE_CLS.has(r.cls)) continue;
     const ent = IX.byMd5.get(r.md5);
     if (!ent) { unresolved.push({ name: r.name, md5: r.md5 }); continue; }
@@ -804,13 +808,14 @@ function exportMapProps(pack, dir, mapId, IX, texFor, defs, serverMaps, log) {
     objects: Object.fromEntries(used.map((d) => [d.id, d])),
     props,
     unresolved,
+    ladders: { note: 'CLadderTrigger boxes (GINS class 0xdedddfeb): pos = box centre, size = full extents (checked against the collision floors of MarineWave Ladder01-03 and FatalZone Box16/17), quat = its rotation; up = the box +Y in the world, the climb axis [INFERIDO: CLadderTrigger 0x98a8e0 tests the climber against planes of the trigger (0x98b5a0 at +0x14..+0x74), their build is not decoded]', list: ladders },
     volumes: { count: volumes.length, note: 'GINS box volumes (class 0x4cc77521: map sectors / trigger areas), no visual, not collision', list: volumes },
     server: server
       ? { mapId, source: 'web-poc/src/host/data/matchData.json (MapStructure.xml)', objects: server, matchedByOrder: netMatch, rule: 'i3Object instances with stateCount >= 2, GINS order', ...(netMatch ? {} : { note: `server lists ${server.length} objects, GINS has ${netProps.length} multi-state i3Object instances: not mapped` }) }
       : { mapId, note: 'no MapStructure entry' },
   };
   fs.writeFileSync(path.join(MAPS, dir, 'props.json'), JSON.stringify(out, null, 1));
-  return { dir, ver, props: props.length, netProps: netProps.length, objects: used.length, unresolved: unresolved.length, volumes: volumes.length, server: server?.length ?? null, netMatch, errors };
+  return { dir, ver, ladders: ladders.length, props: props.length, netProps: netProps.length, objects: used.length, unresolved: unresolved.length, volumes: volumes.length, server: server?.length ?? null, netMatch, errors };
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

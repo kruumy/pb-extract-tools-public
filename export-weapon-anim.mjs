@@ -232,6 +232,19 @@ for (const m of models) {
     const cand = toks.slice(0, n).join('_');
     if (byModel[cand] !== undefined && !missing[cand]) base = cand;
   }
+  // [INFERIDO] no prefix base (ak_47_non_ex, p90_pbtn, cheytec_m200_grs): the complete set most models of its family use;
+  // SCAR-H LB has no family sibling: the SCAR-H CQC set of the same rifle (its sounds are the CQC ones too, export-sfx2017);
+  // AK-47 non_ex ("no extension") would vote the dual-mag set (Fire_Right / LoadMag_Right): the AK set without those clips
+  if (!base && noAi) {
+    const fam = { scar_h_lb_sniper: 'scar_h_cqc', ak_47_non_ex: 'ak_47_elite' }[m.id];
+    if (fam && byModel[fam] !== undefined && !missing[fam]) base = fam;
+    const votes = new Map();
+    if (!base) for (const o of models) if (o.id !== m.id && o.family === m.family && byModel[o.id] !== undefined && !missing[o.id]) {
+      const v = votes.get(byModel[o.id]) ?? { n: 0, id: o.id };
+      v.n++; votes.set(byModel[o.id], v);
+    }
+    if (votes.size) base = [...votes.values()].sort((a, b) => b.n - a.n)[0].id;
+  }
   if (base) { byModel[m.id] = byModel[base]; missing[m.id] = { usesBase: base, lacked: missing[m.id] }; if (noAi) skinBase.push(m.id); }
 }
 

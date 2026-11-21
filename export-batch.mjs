@@ -307,12 +307,39 @@ async function exportWeapons({ only, maxTex, skins, dry, log }) {
   const PACK_ITEM_OVERRIDES = { "Weapon_M-7Knife": 301001 /* ItemStatistics 301001 Name="M-7" */, "Weapon_L115A1_Gold": 105015 /* Name="L115A1 G" */ };
   const entries = [], slot = [], members = [], skinStats = { listed: 0, exported: 0, noTextures: [], shadowed: [] };
   // phase 1 (here, in target order): inspect each pack. slot[seq] = a skipped pack; members = the packs to export.
+  // a Cross _ResName can name the model file inside a pack rather than the pack (Weapon_MP7 holds MP7_DotSight.I3CHR,
+  // Weapon_Glock18_Ex holds Glock18.I3CHR): inner model name -> packs holding it. Read every pack, so only built once a
+  // target pack needs it (an --only run of packs with items by name skips it)
+  let packsOfInner = null;
+  const innerIndex = () => {
+    if (packsOfInner) return packsOfInner;
+    packsOfInner = new Map();
+    for (const n of names) for (const c of CLIENTS) {
+      const f = path.join(c.pack, `Weapon_${n}.i3Pack`);
+      if (!fs.existsSync(f)) continue;
+      let r; try { r = parsePack(fs.readFileSync(f)); } catch { continue; }
+      for (const nd of r.nodes) for (const e of nd.files) if (/\.(i3chr|i3s)$/i.test(e.name)) {
+        const k = norm(e.name.replace(/\.[^.]+$/, ''));
+        const ps = packsOfInner.get(k) || packsOfInner.set(k, []).get(k);
+        if (!ps.includes(n)) ps.push(n);
+      }
+    }
+    return packsOfInner;
+  };
+  // items of no pack by name whose model file sits in pack n; a file found in several bodied packs goes to the shortest name
+  const ownByInner = (n) => [...innerIndex()].filter(([, ps]) => ps.includes(n)).flatMap(([k, ps]) => {
+    if (ps.filter((p) => body(p)?.client).sort((a, b) => a.length - b.length || a.localeCompare(b))[0] !== n) return [];
+    return (resOf.get(k) || []).filter((it) => norm(it.res) === k && !body(it.res)?.client && (!it.skin || norm(it.skin) === k || !body(it.skin)?.client));
+  });
   const targets = [...names].filter((n) => !only || only.test(n) || only.test('Weapon_' + n)).sort();
   targets.forEach((n, seq) => {
     const b = body(n);
     if (!b.client) { if (!/no i3Body/.test(b.tried.cross || '') || Object.values(b.tried).some((r) => /keyed|parse/.test(r))) slot[seq] = { skip: { pack: `Weapon_${n}`, why: b.tried } }; return; }
-    // items whose model is this pack: own res name, or a skin name that is this (bodied) pack
-    const own = (resOf.get(norm(n)) || []).filter((it) => (it.skin && norm(it.skin) === norm(n)) || (!it.skin || it.skin === it.res || !body(it.skin)?.client) && norm(it.res) === norm(n));
+    // items whose model is this pack: own res name, or a skin name that is this (bodied) pack, else a model file inside it.
+    // Only "else": a pack with items of its own also holds the models of what it fires (K201: every GrenadeShell, RPG7: its
+    // shells, C5: the triggers, the bow: its arrows), which are not this weapon
+    const byName = (resOf.get(norm(n)) || []).filter((it) => (it.skin && norm(it.skin) === norm(n)) || (!it.skin || it.skin === it.res || !body(it.skin)?.client) && norm(it.res) === norm(n));
+    const own = byName.length ? byName : ownByInner(n);
     const main = own.find((it) => norm(it.key) === norm(n) && (!it.skin || norm(it.skin) === norm(n))) || own.find((it) => !it.skin || norm(it.skin) === norm(n)) || own[0];
     const statIds = !main ? (PACK_ITEM_OVERRIDES[`Weapon_${n}`] ? [PACK_ITEM_OVERRIDES[`Weapon_${n}`]] : statsByName.get(norm(n)) || []) : [];
     const statId = statIds.find((i) => DUAL.has(classOfId(i)) === /dual/i.test(n)) ?? statIds[0] ?? null;

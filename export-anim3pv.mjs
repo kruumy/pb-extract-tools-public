@@ -107,9 +107,10 @@ export function resolve3pv(name = 'SWAT_Male') {
     let ai = linked ? resolveAI(linked, p.cls) : p ? null : (byAiName.get(norm(w.name)) ?? [])[0] ?? null;
     const dual = DUAL_CLASSES.includes(w.className);
     if (ai && !hasIdle(ai, dual)) {
-      // dual-wield tree: same AI name in a single-weapon group (DualHandGun/DesertEagle -> HandGun/DesertEagle)
-      const alt = (byAiName.get(norm(linked)) ?? []).find((k) => hasIdle(k)) ?? (p && CLASS_FALLBACK[p.cls]);
-      fallback[w.id] = `${ai} (dual) -> ${alt}`;
+      // dual-wield tree: same AI name in a single-weapon group (DualHandGun/DesertEagle -> HandGun/DesertEagle); with no
+      // single tree at all (202025 HK45 Dual: its 1PV is DualHandGun/HK45 too) the dual tree stays, two guns in hand
+      const alt = (byAiName.get(norm(linked)) ?? []).find((k) => hasIdle(k)) ?? (hasIdle(ai, true) ? ai : p && CLASS_FALLBACK[p.cls]);
+      if (alt !== ai) fallback[w.id] = `${ai} (dual) -> ${alt}`;
       ai = alt ?? null;
     } else if (!ai && p && CLASS_FALLBACK[p.cls]) {
       ai = CLASS_FALLBACK[p.cls];

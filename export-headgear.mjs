@@ -207,11 +207,29 @@ function serverItemKeys() {
   return pairs;
 }
 
+// [INFERIDO] looser keys for names the exact key misses: word order and spelling differ between the server and the Cross pef
+// ("WC2014_Argentina" / "Mask_WC_Argentina2014", "Mask Alien - Blue Eye" / "AlienBlueEyes", "Red Bulls Egg" / "Egg_Redbulls_Mask").
+// `tok` = the sorted words (camelCase and digits split, plural s dropped, mask / jason / hat / helmet / headgear dropped);
+// `chr` = the sorted letters of those words. Taken only when one Cross entry of the category has that key; a `chr` match also
+// needs a word in common or the same words up to letter order ("Kopassus" / "Kopasuss"), not just the same letters overall.
+const words = (s) => String(s).replace(/([a-z])([A-Z])/g, '$1 $2').replace(/([a-zA-Z])(\d)|(\d)([a-zA-Z])/g, '$1$3 $2$4').toLowerCase()
+  .split(/[^a-z0-9]+/).filter(Boolean).map((w) => (w.length > 3 ? w.replace(/s$/, '') : w)).map((w) => (w === 'worldcup' ? 'wc' : w))
+  .filter((w) => !['mask', 'jason', 'hat', 'helmet', 'headgear'].includes(w));
+const LOOSE = { tok: (s) => words(s).sort().join(' '), chr: (s) => words(s).join('').split('').sort().join('') };
+const letters = (w) => w.split('').sort().join('');
+const near = (a, b) => { const wa = words(a), wb = words(b); return wa.some((w) => wb.includes(w)) || wa.map(letters).sort().join() === wb.map(letters).sort().join(); };
+// server names misspelled in the seed (system_shop item_name)
+const TYPO = { 'Coboy Hat': 'Cowboy Hat' };
+
 export function mapItems(e17) {
-  const idx = {};
+  const idx = {}, loose = {};
   for (const [cat, o] of Object.entries(e17)) {
     const m = (idx[cat] = new Map());
-    for (const [k, v] of Object.entries(o)) for (const n of [k, (v.ResLocalPath || '').split('/').pop()]) { const x = nn(n); if (x && !m.has(x)) m.set(x, k); }
+    const l = (loose[cat] = { tok: new Map(), chr: new Map() });
+    for (const [k, v] of Object.entries(o)) for (const n of [k, (v.ResLocalPath || '').split('/').pop()]) {
+      const x = nn(n); if (x && !m.has(x)) m.set(x, k);
+      for (const [t, f] of Object.entries(LOOSE)) { const y = f(n); if (y) (l[t].get(y) || l[t].set(y, new Set()).get(y)).add(k); }
+    }
   }
   const items = {};
   for (const [id, k3] of serverItemKeys()) {
@@ -221,6 +239,15 @@ export function mapItems(e17) {
     for (const cat of CATS[cls]) {
       const k17 = idx[cat]?.get(want);
       if (k17) { items[id] = { cat, k17, slot: SLOT[cls], name3: k3 }; break; }
+    }
+  }
+  for (const t of Object.keys(LOOSE)) for (const [id, k3] of serverItemKeys()) {
+    const cls = Math.floor(id / 100000);
+    if (!SLOT[cls] || items[id]) continue;
+    const name = n3(TYPO[k3] ?? k3), want = LOOSE[t](name);
+    for (const cat of CATS[cls]) {
+      const ks = want && loose[cat]?.[t].get(want), k = ks?.size === 1 ? [...ks][0] : null;
+      if (k && (t !== 'chr' || [k, (e17[cat][k].ResLocalPath || '').split('/').pop()].some((n) => near(name, n)))) { items[id] = { cat, k17: k, slot: SLOT[cls], name3: k3, match: t }; break; }
     }
   }
   return items;

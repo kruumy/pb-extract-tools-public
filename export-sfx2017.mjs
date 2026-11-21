@@ -258,6 +258,9 @@ for (const w of weapons) {
 // [INFERIDO: same weapon, same pack, only candidate]: OA-93 dual (118xxx) asks WM_OA-93_Dual_Fire, the pack has WM_OA-93_Dual_Attack.
 // Without it the 11 OA-93 variants fell to the single OA-93 clip of the class guess.
 const FIRE_ALIAS = { 'wm_oa-93_dual_fire': 'wm_oa-93_dual_attack' };
+// SCAR-H Std Sil (103070) / SCAR-H LB (103088) name WM_SCAR_STD_* / WM_SCAR_LB_* clips no Cross pack has: the SCAR-H CQC set of
+// the same rifle [INFERIDO: not their own recordings; the Std Sil fire is not muffled]
+for (const p of ['wm_scar_std', 'wm_scar_lb']) for (const s of ['fire', 'change', 'load', 'reload', 'remove_1', 'remove_2']) FIRE_ALIAS[`${p}_${s}`] = `wm_scar-h_cqc_${s}`;
 for (const [from, to] of Object.entries(FIRE_ALIAS)) if (!files.has(from) && files.has(to)) files.set(from, files.get(to));
 
 for (const w of weapons) {

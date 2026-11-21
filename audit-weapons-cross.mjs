@@ -39,8 +39,23 @@ export function audit() {
   const norm = (s) => String(s).toLowerCase().replace(/[^a-z0-9]/g, '');
   const modelOfKey = new Map();
   for (const m of models) for (const it of m.items ?? []) if (!modelOfKey.has(norm(it.key))) modelOfKey.set(norm(it.key), m);
+  // not sold (user, 2026-11-20): pef stand-ins of another weapon (OriginalWeapon / OriginalWeaponID: the thrown MiniAxe, the
+  // Kriss S.V second gun) and the _D version of a weapon whose plain block exists. Still complete: the client draws them (a
+  // thrown axe, a copy already owned); only the shop and unlock-all leave them out (server src/shared/shop.ts)
+  const blocks = new Set([...pef.values()].map((p) => `${p.cls}/${p.key}`));
+  const notSold = (p) => {
+    const of = p?.e.OriginalWeapon ?? p?.e.OriginalWeaponID;
+    if (of !== undefined) return `stand-in of ${of}`;
+    return p && /_D$/.test(p.key) && blocks.has(`${p.cls}/${p.key.slice(0, -2)}`) ? `D version of ${p.key.slice(0, -2)}` : null;
+  };
   const rows = [];
   for (const w of catalog) {
+    // projectiles (GrenadeShell / RPG7Shell / GrenadeArrow shells, the bow's arrow): never held or sold, the launcher resolves
+    // them by pb.src (WeaponSystem shellLoad), so they are listed apart instead of as incomplete weapons
+    if (/^pef-cross:(GrenadeShell\/|Melee\/Compound_Bow_.*_Arrow$)/.test(w.pb?.src ?? '')) {
+      rows.push({ id: w.id, name: w.name, slot: w.slotName, cls: w.className, projectile: true, miss: [] });
+      continue;
+    }
     const p = pef.get(w.id), m = modelOf.get(w.id) ?? (p && modelOfKey.get(norm(p.key))), miss = [];
     if (!p) miss.push('pef-cross');
     if (!m || m.client !== 'cross' || m.textured === false) miss.push(m ? `model (${m.client}${m.textured === false ? ', untextured' : ''})` : 'model');
@@ -51,12 +66,13 @@ export function audit() {
     // the entry must carry the named fire clip when the pef names one (a swap-only entry left SCAR-H Std Sil passing)
     if (!sfx[w.id] || (w.pb?.fireSound && !sfx[w.id].fire)) miss.push('sfx' + (w.pb?.fireSound && !sfx[w.id]?.fire ? ` (fire ${w.pb.fireSound} not in Cross)` : ''));
     if (!icons.some((ix) => ix[w.id]?.sheet)) miss.push('icon');
-    rows.push({ id: w.id, name: w.name, slot: w.slotName, cls: w.className, ai1pv: a1.SWAT_Male.weapons[w.id] ?? null, ai3pv: k3 ?? null, model: m?.id ?? null, miss });
+    rows.push({ id: w.id, name: w.name, slot: w.slotName, cls: w.className, ai1pv: a1.SWAT_Male.weapons[w.id] ?? null, ai3pv: k3 ?? null, model: m?.id ?? null, miss, notSold: notSold(p) });
   }
   return rows;
 }
 
-function write(rows) {
+function write(all) {
+  const rows = all.filter((r) => !r.projectile);
   const counts = {};
   for (const r of rows) {
     const c = (counts[`${r.slot}/${r.cls}`] ??= { complete: 0, incomplete: 0 });
@@ -68,6 +84,8 @@ function write(rows) {
     counts,
     complete: rows.filter((r) => !r.miss.length).map((r) => r.id).sort((a, b) => a - b),
     incomplete: Object.fromEntries(rows.filter((r) => r.miss.length).map((r) => [r.id, `${r.name}: ${r.miss.join('; ')}`])),
+    projectiles: Object.fromEntries(all.filter((r) => r.projectile).map((r) => [r.id, r.name])),
+    notSold: Object.fromEntries(rows.filter((r) => r.notSold).map((r) => [r.id, `${r.name}: ${r.notSold}`])),
   };
   fs.writeFileSync(OUT, JSON.stringify(out, null, 1));
   const tot = rows.length, ok = out.complete.length;
@@ -81,7 +99,7 @@ function list(ids) {
   for (const id of want) {
     const r = rows.find((x) => x.id === id);
     if (!r) { const p = pef.get(id); console.log(`${id}\t${p?.key ?? '?'}\tINCOMPLETE: not in weapons.json${p ? `; pef-cross ${p ? 'yes' : 'no'}; LinkedToCharaAI ${p.linked}` : ''}`); continue; }
-    console.log(`${r.id}\t${r.name}\t${r.miss.length ? `INCOMPLETE: ${r.miss.join('; ')}` : 'complete'}\t1pv=${r.ai1pv}\t3pv=${r.ai3pv}\tmodel=${r.model}`);
+    console.log(`${r.id}\t${r.name}\t${r.projectile ? 'projectile' : r.miss.length ? `INCOMPLETE: ${r.miss.join('; ')}` : 'complete'}\t1pv=${r.ai1pv}\t3pv=${r.ai3pv}\tmodel=${r.model}`);
   }
 }
 
